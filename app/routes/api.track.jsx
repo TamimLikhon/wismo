@@ -1,4 +1,3 @@
-import { json } from "@remix-run/node";
 import { authenticate } from "../shopify.server";
 
 // This is the API endpoint: /api/track
@@ -14,7 +13,7 @@ export const loader = async ({ request }) => {
   const email = url.searchParams.get("email");
 
   if (!orderName || !email) {
-    return json({ error: "Missing order number or email" }, { status: 400 });
+    return Response.json({ error: "Missing order number or email" }, { status: 400 });
   }
 
   try {
@@ -61,7 +60,7 @@ export const loader = async ({ request }) => {
     */
 
     // MOCK DATA FOR NOW (until we have real API access)
-    let upsellProducts = [];
+    // let upsellProducts = []; // eslint-disable-line no-unused-vars
 
     // UPSELL LOGIC: Check settings from file (TODO: implement readSettings here if needed)
     /* 
@@ -71,7 +70,7 @@ export const loader = async ({ request }) => {
     
     // Simulate finding an order if the input looks valid
     if (orderName === "1001" && email === "test@example.com") {
-        return json({
+        return Response.json({
             found: true,
             status: "FULFILLED",
             tracking: {
@@ -93,7 +92,7 @@ export const loader = async ({ request }) => {
         });
     } else {
         // Simulate "Order Not Found"
-        return json({ 
+        return Response.json({ 
             found: false, 
             message: "We couldn't find an order with that number and email." 
         }, { status: 404 });
@@ -101,6 +100,6 @@ export const loader = async ({ request }) => {
 
   } catch (error) {
     console.error("Tracking API Error:", error);
-    return json({ error: "Internal Server Error" }, { status: 500 });
+    return Response.json({ error: "Internal Server Error" }, { status: 500 });
   }
 };

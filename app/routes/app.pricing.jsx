@@ -1,5 +1,4 @@
-import { json, redirect } from "@remix-run/node";
-import { useLoaderData, Form } from "@remix-run/react";
+import { useLoaderData, Form } from "react-router";
 import { authenticate } from "../shopify.server";
 
 // Define our plans here
@@ -38,7 +37,7 @@ export const loader = async ({ request }) => {
     onFailure: async () => billing.request({ plan: PLANS[1].name, isTest: true }), // Redirect to payment if failed
   });
 
-  return json({ plans: PLANS });
+  return Response.json({ plans: PLANS });
 };
 
 export const action = async ({ request }) => {
@@ -50,11 +49,14 @@ export const action = async ({ request }) => {
   
   if (selectedPlan) {
     // Redirect them to Shopify's billing approval page
-    return await billing.request({
+    const response = await billing.request({
       plan: selectedPlan.name,
       isTest: true, // Important for dev stores!
       returnUrl: `https://${process.env.SHOPIFY_APP_URL}/app`,
     });
+    return response;
+    // Note: billing.request usually returns a redirect Response, so we can just return it.
+    // If it throws, we might need to handle it, but for now we follow the pattern.
   }
   
   return null;

@@ -215,12 +215,7 @@ export default function Index() {
             GraphQL
           </s-link>
         </s-paragraph>
-        <s-paragraph>
-          <s-text>Database: </s-text>
-          <s-link href="https://www.prisma.io/" target="_blank">
-            Prisma
-          </s-link>
-        </s-paragraph>
+
       </s-section>
 
       <s-section slot="aside" heading="Next steps">

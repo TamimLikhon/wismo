@@ -1,39 +1,23 @@
-import { json } from "@remix-run/node";
-import { useLoaderData, Form } from "@remix-run/react";
+import { useLoaderData, Form } from "react-router";
 import { authenticate } from "../shopify.server";
-import fs from "fs/promises";
-import path from "path";
-
-const SETTINGS_FILE = path.resolve(process.cwd(), "wismo-settings.json");
-
-async function readSettings(shop) {
-  try {
-    const data = await fs.readFile(SETTINGS_FILE, "utf-8");
-    const allSettings = JSON.parse(data);
-    return allSettings[shop] || {};
-  } catch (error) {
-    return {};
-  }
-}
-
-async function writeSettings(shop, newSettings) {
-  let allSettings = {};
-  try {
-    const data = await fs.readFile(SETTINGS_FILE, "utf-8");
-    allSettings = JSON.parse(data);
-  } catch (error) {
-    // File doesn't exist or is invalid, start empty
-  }
-  
-  allSettings[shop] = { ...allSettings[shop], ...newSettings };
-  await fs.writeFile(SETTINGS_FILE, JSON.stringify(allSettings, null, 2));
-  return allSettings[shop];
-}
+import { supabase } from "../supabase.server";
 
 export const loader = async ({ request }) => {
   const { session } = await authenticate.admin(request);
-  const settings = await readSettings(session.shop);
-  return json({ settings });
+  
+  // Find settings for this shop
+  const { data: settings, error } = await supabase
+    .from("wismo_settings")
+    .select("*")
+    .eq("shop", session.shop)
+    .single();
+
+  if (error && error.code !== "PGRST116") { // PGRST116 is "Row not found"
+      console.error("Supabase Error:", error);
+  }
+
+  // Use native Response.json()
+  return Response.json({ settings: settings || {} });
 };
 
 export const action = async ({ request }) => {
@@ -44,13 +28,22 @@ export const action = async ({ request }) => {
   const upsellTitle = formData.get("upsellTitle");
   const isEnabled = formData.get("isEnabled") === "on";
 
-  await writeSettings(session.shop, {
-    upsellCollectionId,
-    upsellTitle,
-    isEnabled,
-  });
+  // Upsert settings (Create if new, Update if exists)
+  const { error } = await supabase
+    .from("wismo_settings") // Ensure table exists
+    .upsert({
+      shop: session.shop,
+      upsell_collection_id: upsellCollectionId, 
+      upsell_title: upsellTitle,
+      is_enabled: isEnabled,
+    }, { onConflict: 'shop' });
 
-  return json({ success: true });
+  if (error) {
+    console.error("Supabase Write Error:", error);
+    return Response.json({ success: false, error: error.message }, { status: 500 });
+  }
+
+  return Response.json({ success: true });
 };
 
 export default function Settings() {
@@ -68,7 +61,7 @@ export default function Settings() {
             <input 
               type="checkbox" 
               name="isEnabled" 
-              defaultChecked={settings?.isEnabled} 
+              defaultChecked={settings?.is_enabled} 
               style={{ width: "20px", height: "20px" }}
             />
             Enable Upsell Engine
@@ -80,7 +73,7 @@ export default function Settings() {
           <input 
             type="text" 
             name="upsellCollectionId" 
-            defaultValue={settings?.upsellCollectionId || ""} 
+            defaultValue={settings?.upsell_collection_id || ""} 
             placeholder="gid://shopify/Collection/123456789"
             style={{ width: "100%", padding: "10px", fontSize: "1em", border: "1px solid #ccc", borderRadius: "4px" }}
           />
@@ -94,7 +87,7 @@ export default function Settings() {
           <input 
             type="text" 
             name="upsellTitle" 
-            defaultValue={settings?.upsellTitle || "You might also like"} 
+            defaultValue={settings?.upsell_title || "You might also like"} 
             style={{ width: "100%", padding: "10px", fontSize: "1em", border: "1px solid #ccc", borderRadius: "4px" }}
           />
         </div>
