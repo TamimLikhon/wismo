@@ -1,0 +1,106 @@
+/* WISMO Widget Styling - Native Mode */
+
+.wismo-app-container {
+  /* Use inherit to pick up theme fonts */
+  font-family: inherit;
+  max-width: 400px;
+  margin: 0 auto;
+}
+
+.wismo-form {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.wismo-field {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.wismo-field label {
+  /* Use CSS variables if available, fallback to inherit */
+  font-size: 0.9em;
+  font-weight: 600;
+  color: var(--color-body-text, inherit);
+}
+
+.wismo-field input {
+  padding: 10px;
+  /* Use theme border color or fallback */
+  border: 1px solid var(--color-border, #ccc);
+  border-radius: var(--border-radius-base, 4px);
+  font-size: 1em;
+  font-family: inherit;
+  background-color: var(--color-bg, #fff);
+  color: var(--color-body-text, inherit);
+}
+
+button#wismo-submit {
+  padding: 12px;
+  /* Attempt to use theme button colors */
+  background-color: var(--color-btn-primary, #000); 
+  color: var(--color-btn-primary-text, #fff);
+  border: none;
+  border-radius: var(--border-radius-btn, 4px);
+  font-weight: bold;
+  cursor: pointer;
+  transition: opacity 0.2s;
+  font-family: inherit;
+}
+
+button#wismo-submit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+button#wismo-submit:hover:not(:disabled) {
+  opacity: 0.8;
+}
+
+/* Professional & Minimal Status Badges */
+.wismo-message {
+  padding: 10px;
+  border-radius: 4px;
+  font-size: 0.9em;
+  text-align: center;
+  margin-top: 10px;
+}
+
+.wismo-error {
+  background-color: #fff4f4;
+  color: #d82c0d;
+  border: 1px solid #fecaca;
+}
+
+.wismo-result {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--color-border, #eee);
+  text-align: center;
+}
+
+.wismo-status-badge {
+  display: inline-block;
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-weight: bold;
+  font-size: 0.9em;
+  margin-bottom: 10px;
+  background-color: #f4f6f8;
+  color: #333;
+}
+
+.wismo-status-badge.fulfilled {
+  background-color: #c4f1cd; 
+  color: #004d2e;
+}
+
+.wismo-track-btn {
+  display: inline-block;
+  margin-top: 5px;
+  color: var(--color-btn-primary, #000);
+  text-decoration: underline;
+  font-weight: 600;
+}

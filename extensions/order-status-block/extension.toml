@@ -1,0 +1,18 @@
+name = "Wismo Order Tracker"
+type = "theme_app_extension"
+
+# This defines the "blocks" available to the merchant
+[[blocks]]
+type = "app_block"
+name = "Order Tracking Widget"
+target = "section"  # Allows dragging into sections
+enabled_on = { templates = ["page", "index", "product", "article", "cart"] }
+
+# Link the block file
+block_file = "blocks/wismo-block.liquid"
+
+# Link the settings schema (if any)
+settings = [
+  { type = "text", id = "title", label = "Title", default = "Track Your Order" },
+  { type = "color", id = "button_color", label = "Button Color", default = "#000000" }
+]

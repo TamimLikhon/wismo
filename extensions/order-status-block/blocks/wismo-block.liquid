@@ -1,0 +1,52 @@
+{% schema %}
+{
+  "name": "Order Tracking Widget",
+  "target": "section",
+  "stylesheet": "wismo-widget.css",
+  "javascript": "wismo-widget.js",
+  "settings": [
+    { 
+      "type": "text", 
+      "id": "title", 
+      "label": "Heading", 
+      "default": "Track Your Order" 
+    },
+    {
+      "type": "text",
+      "id": "support_email",
+      "label": "Support Email",
+      "info": "Leave blank to use store email.",
+      "default": "" 
+    },
+    {
+       "type": "header",
+       "content": "Professional Settings"
+    },
+    {
+      "type": "checkbox",
+      "id": "show_predictive_text",
+      "label": "Show reassuring text?",
+      "default": true
+    }
+  ]
+}
+{% endschema %}
+
+<div class="wismo-app-container" style="padding: 20px;">
+  {% if block.settings.title != blank %}
+    <h2 style="margin-bottom: 20px; text-align: center;">{{ block.settings.title }}</h2>
+  {% endif %}
+  
+  <!-- This is where our Widget mounts -->
+  <div id="wismo-root"></div>
+  
+  <!-- Pass settings to JS via data attributes -->
+  <script>
+    window.WISMO_CONFIG = {
+      apiUrl: "{{ shop.url }}/apps/wismo/api/track",
+      shopDomain: "{{ shop.permanent_domain }}",
+      supportEmail: "{{ block.settings.support_email | default: shop.email }}",
+      showPredictiveText: {{ block.settings.show_predictive_text | default: true }}
+    };
+  </script>
+</div>
