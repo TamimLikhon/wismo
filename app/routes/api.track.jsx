@@ -1,4 +1,4 @@
-import { authenticate, unauthenticated } from "../shopify.server";
+import shopify from "../shopify.server";
 import { supabase } from "../supabase.server";
 
 // This is the API endpoint: /api/track
@@ -18,7 +18,7 @@ export const loader = async ({ request }) => {
 
     // 1. Try standard App Proxy authentication
     try {
-      const authResult = await authenticate.public.appProxy(request);
+      const authResult = await shopify.authenticate.public.appProxy(request);
       session = authResult.session;
       admin = authResult.admin;
       console.log("App Proxy auth succeeded. Session shop:", session?.shop);
@@ -44,10 +44,9 @@ export const loader = async ({ request }) => {
     }
 
     // 4. Admin client check
-    // If we have a session but no admin (e.g. scopes changed or session invalid), try unauthenticated admin
     if (!admin && session.shop) {
          try {
-            admin = await unauthenticated.admin(session.shop);
+            admin = (await shopify.unauthenticated.admin(session.shop)).admin;
             console.log("Obtained unauthenticated admin client.");
          } catch (e) {
             console.warn("Failed to get unauthenticated admin:", e.message);
@@ -81,12 +80,14 @@ export const loader = async ({ request }) => {
     // Normalize Inputs
     const normalizedEmail = email.toLowerCase().trim();
     let normalizedOrderName = orderName.trim();
+    // Prepend # if it's purely numeric
     if (/^\d+$/.test(normalizedOrderName)) {
       normalizedOrderName = `#${normalizedOrderName}`;
     }
 
     // 5. Query Shopify for Order (Name Only)
-    console.log(`Querying Shopify for order: name:${normalizedOrderName}`);
+    // FIX: Wrapping name in single quotes to handle special characters like #
+    console.log(`Querying Shopify for order: name:'${normalizedOrderName}'`);
     
     const orderResponse = await admin.graphql(
       `#graphql
@@ -124,15 +125,13 @@ export const loader = async ({ request }) => {
           }
         }
       }`,
-      { variables: { query: `name:${normalizedOrderName}` } }
+      { variables: { query: `name:'${normalizedOrderName}'` } }
     );
 
     const orderData = await orderResponse.json();
     
-    // Check for GraphQL errors
     if (orderData.errors) {
         console.error("Shopify GraphQL Errors (Order):", JSON.stringify(orderData.errors));
-        // We continue, treating it as not found or we could return error
     }
 
     // Filter for email match
@@ -149,7 +148,11 @@ export const loader = async ({ request }) => {
             .maybeSingle();
 
         if (settings?.is_enabled && settings.upsell_collection_id) {
-            // Fetch real products from Shopify
+            // FIX: Normalize Collection ID to GID format
+            const collectionId = settings.upsell_collection_id.startsWith("gid://")
+                ? settings.upsell_collection_id
+                : `gid://shopify/Collection/${settings.upsell_collection_id}`;
+
             const productsResponse = await admin.graphql(
                 `#graphql
                 query getCollectionProducts($id: ID!) {
@@ -175,7 +178,7 @@ export const loader = async ({ request }) => {
                         }
                     }
                 }`,
-                { variables: { id: settings.upsell_collection_id } }
+                { variables: { id: collectionId } }
             );
             
             const productsData = await productsResponse.json();
@@ -198,7 +201,7 @@ export const loader = async ({ request }) => {
             if (products.length > 0) {
                 upsellData = {
                     title: settings.upsell_title || "You might also like",
-                    collectionId: settings.upsell_collection_id,
+                    collectionId: collectionId,
                     products
                 };
             }
@@ -212,7 +215,6 @@ export const loader = async ({ request }) => {
        const fulfillment = order.fulfillments?.[0];
        const tracking = fulfillment?.trackingInfo?.[0];
 
-       // Format date if needed, or just return basic info
        return Response.json({
          found: true,
          status: order.displayFulfillmentStatus,
