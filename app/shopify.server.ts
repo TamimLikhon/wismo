@@ -5,7 +5,7 @@ import {
   shopifyApp,
 } from "@shopify/shopify-app-react-router/server";
 import { BillingInterval } from "@shopify/shopify-api";
-import { MemorySessionStorage } from "@shopify/shopify-app-session-storage-memory";
+import { SupabaseSessionStorage } from "./session.storage";
 
 const shopify = shopifyApp({
   apiKey: process.env.SHOPIFY_API_KEY,
@@ -14,7 +14,7 @@ const shopify = shopifyApp({
   scopes: process.env.SCOPES?.split(","),
   appUrl: process.env.SHOPIFY_APP_URL || "",
   authPathPrefix: "/auth",
-  sessionStorage: new MemorySessionStorage(),
+  sessionStorage: new SupabaseSessionStorage(),
   distribution: AppDistribution.AppStore,
   future: {
     expiringOfflineAccessTokens: true,
