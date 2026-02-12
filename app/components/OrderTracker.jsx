@@ -15,7 +15,11 @@ export function OrderTracker() {
 
     try {
       // Call our backend API
-      const response = await fetch(`/api/track?orderName=${orderNumber}&email=${email}`);
+      const params = new URLSearchParams({
+        orderName: orderNumber,
+        email: email
+      });
+      const response = await fetch(`/api/track?${params.toString()}`);
       const data = await response.json();
 
       if (response.ok) {

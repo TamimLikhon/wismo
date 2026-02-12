@@ -1,4 +1,4 @@
-import { authenticate } from "../shopify.server";
+import { authenticate, unauthenticated } from "../shopify.server";
 import { supabase } from "../supabase.server";
 
 // This is the API endpoint: /api/track
@@ -6,26 +6,92 @@ import { supabase } from "../supabase.server";
 
 export const loader = async ({ request }) => {
   // 1. Authenticate the request coming from Shopify Proxy
-  const { session, admin } = await authenticate.public.appProxy(request);
-
-  if (!session || !admin) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 });
-  }
+  console.log("-----------------------[Request Start]----------------------------");
   
   const url = new URL(request.url);
-  const orderName = url.searchParams.get("orderName"); // e.g., "1001"
-  const email = url.searchParams.get("email");
-
-  if (!orderName || !email) {
-    return Response.json({ error: "Missing order number or email" }, { status: 400 });
-  }
+  console.log("Proxy Request URL:", url.toString());
 
   try {
-    // 2. Search for the order in Shopify using Admin GraphQL
-    const response = await admin.graphql(
+    let session = null;
+    let admin = null;
+    const shopDomain = url.searchParams.get("shop");
+
+    // 1. Try standard App Proxy authentication
+    try {
+      const authResult = await authenticate.public.appProxy(request);
+      session = authResult.session;
+      admin = authResult.admin;
+      console.log("App Proxy auth succeeded. Session shop:", session?.shop);
+    } catch (authError) {
+      if (authError instanceof Response) throw authError;
+      console.warn("App Proxy Auth failed:", authError.message);
+    }
+
+    // 2. Dev mode fallback
+    const isDev = process.env.NODE_ENV === "development";
+
+    if (!session && isDev && shopDomain) {
+      console.warn("⚠️ DEV MODE: No session found. Creating mock session.");
+      session = { shop: shopDomain };
+    }
+
+    // 3. Authorization check
+    if (!session) {
+      return Response.json({
+        error: "Unauthorized",
+        message: "Must be accessed via App Proxy"
+      }, { status: 401 });
+    }
+
+    // 4. Admin client check
+    // If we have a session but no admin (e.g. scopes changed or session invalid), try unauthenticated admin
+    if (!admin && session.shop) {
+         try {
+            admin = await unauthenticated.admin(session.shop);
+            console.log("Obtained unauthenticated admin client.");
+         } catch (e) {
+            console.warn("Failed to get unauthenticated admin:", e.message);
+         }
+    }
+    
+    // Mock admin for dev if still missing
+    if (!admin && isDev) {
+        console.warn("⚠️ DEV MODE: Using mock admin.");
+        admin = {
+            graphql: async () => ({
+                json: async () => ({ data: { orders: { edges: [] } } })
+            })
+        };
+    }
+
+    if (!admin) {
+        return Response.json({
+            error: "Service unavailable",
+            message: "Could not connect to Shopify API."
+        }, { status: 503 });
+    }
+
+    const orderName = url.searchParams.get("orderName");
+    const email = url.searchParams.get("email");
+
+    if (!orderName || !email) {
+      return Response.json({ error: "Missing order number or email" }, { status: 400 });
+    }
+
+    // Normalize Inputs
+    const normalizedEmail = email.toLowerCase().trim();
+    let normalizedOrderName = orderName.trim();
+    if (/^\d+$/.test(normalizedOrderName)) {
+      normalizedOrderName = `#${normalizedOrderName}`;
+    }
+
+    // 5. Query Shopify for Order (Name Only)
+    console.log(`Querying Shopify for order: name:${normalizedOrderName}`);
+    
+    const orderResponse = await admin.graphql(
       `#graphql
       query getOrder($query: String!) {
-        orders(first: 1, query: $query) {
+        orders(first: 5, query: $query) {
           edges {
             node {
               id
@@ -58,63 +124,122 @@ export const loader = async ({ request }) => {
           }
         }
       }`,
-      {
-        variables: {
-          query: `name:${orderName} AND email:${email}`
-        },
-      }
+      { variables: { query: `name:${normalizedOrderName}` } }
     );
 
-    const data = await response.json();
-    const order = data.data.orders.edges[0]?.node;
-
-    // 3. Fetch Upsell Settings from Supabase
-    const { data: settings } = await supabase
-      .from("wismo_settings")
-      .select("*")
-      .eq("shop", session.shop)
-      .single();
+    const orderData = await orderResponse.json();
     
-    // 4. Upsell Logic (Mocked product fetching for now, using settings)
-    let upsellData = null;
-    if (settings?.is_enabled) {
-        upsellData = {
-            title: settings.upsell_title || "You might also like",
-            collectionId: settings.upsell_collection_id,
-            products: [
-                // In a real scenario, we'd fetch products from the collection via Admin API here
-                { title: "Cool Socks", price: "$10.00", image: "https://via.placeholder.com/100", url: "/products/cool-socks" },
-                { title: "Matching Hat", price: "$25.00", image: "https://via.placeholder.com/100", url: "/products/matching-hat" }
-            ]
-        };
+    // Check for GraphQL errors
+    if (orderData.errors) {
+        console.error("Shopify GraphQL Errors (Order):", JSON.stringify(orderData.errors));
+        // We continue, treating it as not found or we could return error
     }
 
-    if (order) {
-        // Transform Shopify Data to simplified JSON
-        const fulfillment = order.fulfillments[0];
-        const tracking = fulfillment?.trackingInfo[0];
+    // Filter for email match
+    const potentialOrders = orderData.data?.orders?.edges?.map(e => e.node) || [];
+    const order = potentialOrders.find(o => o.email && o.email.toLowerCase() === normalizedEmail);
 
-        return Response.json({
-            found: true,
-            status: order.displayFulfillmentStatus,
-            tracking: tracking ? {
-                carrier: tracking.company,
-                number: tracking.number,
-                url: tracking.url
-            } : null,
-            items: order.lineItems.edges.map(edge => edge.node.name),
-            estimatedDelivery: "Calculated based on carrier...", // Placeholder
-            upsell: upsellData
-        });
+    // 6. Fetch Upsell Settings & Products
+    let upsellData = null;
+    try {
+        const { data: settings } = await supabase
+            .from("wismo_settings")
+            .select("*")
+            .eq("shop", session.shop)
+            .maybeSingle();
+
+        if (settings?.is_enabled && settings.upsell_collection_id) {
+            // Fetch real products from Shopify
+            const productsResponse = await admin.graphql(
+                `#graphql
+                query getCollectionProducts($id: ID!) {
+                    collection(id: $id) {
+                        products(first: 4) {
+                            edges {
+                                node {
+                                    id
+                                    title
+                                    handle
+                                    featuredImage {
+                                        url
+                                    }
+                                    priceRangeV2 {
+                                        minVariantPrice {
+                                            amount
+                                            currencyCode
+                                        }
+                                    }
+                                    onlineStoreUrl
+                                }
+                            }
+                        }
+                    }
+                }`,
+                { variables: { id: settings.upsell_collection_id } }
+            );
+            
+            const productsData = await productsResponse.json();
+             if (productsData.errors) {
+                console.warn("Shopify GraphQL Errors (Products):", JSON.stringify(productsData.errors));
+            }
+
+            const products = productsData.data?.collection?.products?.edges?.map(e => {
+                const p = e.node;
+                return {
+                    title: p.title,
+                    price: p.priceRangeV2?.minVariantPrice?.amount 
+                        ? `${p.priceRangeV2.minVariantPrice.amount} ${p.priceRangeV2.minVariantPrice.currencyCode}` 
+                        : "Check Price",
+                    image: p.featuredImage?.url || "",
+                    url: p.onlineStoreUrl || `/products/${p.handle}`
+                };
+            }) || [];
+
+            if (products.length > 0) {
+                upsellData = {
+                    title: settings.upsell_title || "You might also like",
+                    collectionId: settings.upsell_collection_id,
+                    products
+                };
+            }
+        }
+    } catch (e) {
+        console.warn("Upsell fetch failed:", e.message);
+    }
+
+    // 7. Construct Response
+    if (order) {
+       const fulfillment = order.fulfillments?.[0];
+       const tracking = fulfillment?.trackingInfo?.[0];
+
+       // Format date if needed, or just return basic info
+       return Response.json({
+         found: true,
+         status: order.displayFulfillmentStatus,
+         tracking: tracking ? {
+           carrier: tracking.company,
+           number: tracking.number,
+           url: tracking.url
+         } : null,
+         items: order.lineItems?.edges?.map(edge => edge.node.name) || [],
+         estimatedDelivery: "Calculated based on carrier...", 
+         upsell: upsellData
+       });
     } else {
-        return Response.json({ 
-            found: false, 
-            message: "We couldn't find an order with that number and email." 
-        }, { status: 404 });
+       return Response.json({
+         found: false,
+         message: "We couldn't find an order with that number and email."
+       }, { status: 404 });
     }
 
   } catch (error) {
-    console.error("Tracking API Error:", error);
-    return Response.json({ error: "Internal Server Error" }, { status: 500 });
+    if (error instanceof Response) throw error;
+    console.error("API Error:", error);
+    return Response.json({ 
+        error: "Internal Server Error", 
+        message: "Something went wrong. Please try again later." 
+    }, { status: 500 });
+  } finally {
+    console.log("-----------------------[Request End]----------------------------");
   }
-};
+}
