@@ -5,7 +5,7 @@
 
   // Defaults + Liquid Settings
   const CONFIG = window.WISMO_CONFIG || { 
-    apiUrl: '/apps/wismo/api/track', 
+    apiUrl: '/apps/track', 
     supportEmail: 'support@example.com',
     showPredictiveText: true
   };

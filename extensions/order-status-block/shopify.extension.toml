@@ -1,4 +1,5 @@
 name = "Wismo Order Tracker"
+uid = "38ef7ade-f151-8032-7d78-36901c8d3a088446de59"
 type = "theme_app_extension"
 
 # This defines the "blocks" available to the merchant

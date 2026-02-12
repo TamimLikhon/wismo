@@ -16,7 +16,7 @@
       "id": "support_email",
       "label": "Support Email",
       "info": "Leave blank to use store email.",
-      "default": "" 
+      "default": "support@example.com"
     },
     {
        "type": "header",
@@ -43,7 +43,7 @@
   <!-- Pass settings to JS via data attributes -->
   <script>
     window.WISMO_CONFIG = {
-      apiUrl: "{{ shop.url }}/apps/wismo/api/track",
+      apiUrl: "{{ shop.url }}/apps/track",
       shopDomain: "{{ shop.permanent_domain }}",
       supportEmail: "{{ block.settings.support_email | default: shop.email }}",
       showPredictiveText: {{ block.settings.show_predictive_text | default: true }}
