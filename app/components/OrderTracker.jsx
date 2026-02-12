@@ -42,8 +42,9 @@ export function OrderTracker() {
       
       <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
         <div>
-          <label style={{ display: "block", marginBottom: "5px", fontSize: "0.9em" }}>Order Number</label>
+          <label htmlFor="orderNumber" style={{ display: "block", marginBottom: "5px", fontSize: "0.9em" }}>Order Number</label>
           <input
+            id="orderNumber"
             type="text"
             placeholder="#1001"
             value={orderNumber}
@@ -54,8 +55,9 @@ export function OrderTracker() {
         </div>
         
         <div>
-          <label style={{ display: "block", marginBottom: "5px", fontSize: "0.9em" }}>Email Address</label>
+          <label htmlFor="email" style={{ display: "block", marginBottom: "5px", fontSize: "0.9em" }}>Email Address</label>
           <input
+            id="email"
             type="email"
             placeholder="you@example.com"
             value={email}

@@ -1,15 +1,19 @@
 import { authenticate } from "../shopify.server";
+import { supabase } from "../supabase.server";
 
 // This is the API endpoint: /api/track
-// It receives a GET request with ?orderId=1001&email=customer@example.com
+// Accessed via App Proxy: https://example.com/apps/track?orderName=1001&email=customer@example.com
 
 export const loader = async ({ request }) => {
-  // 1. Authenticate the request (ensure it's from a valid session or public access token if needed)
-  // For a public-facing tracking page, we might use a slightly different auth strategy or a proxy.
-  // Here we assume we are using the unauthenticated admin context or a custom proxy app extension.
+  // 1. Authenticate the request coming from Shopify Proxy
+  const { session, admin } = await authenticate.public.appProxy(request);
+
+  if (!session || !admin) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
   
   const url = new URL(request.url);
-  const orderName = url.searchParams.get("orderName"); // e.g., "#1001" or just "1001"
+  const orderName = url.searchParams.get("orderName"); // e.g., "1001"
   const email = url.searchParams.get("email");
 
   if (!orderName || !email) {
@@ -17,13 +21,7 @@ export const loader = async ({ request }) => {
   }
 
   try {
-    // 2. Search for the order in Shopify
-    // We use the Admin API to find orders matching the name and email.
-    // Note: In production, you'd use the `admin` object from `authenticate.admin(request)`.
-    // Since we are mocking the setup, here is the logic:
-    
-    /* 
-    const { admin } = await authenticate.admin(request);
+    // 2. Search for the order in Shopify using Admin GraphQL
     const response = await admin.graphql(
       `#graphql
       query getOrder($query: String!) {
@@ -35,13 +33,25 @@ export const loader = async ({ request }) => {
               email
               displayFulfillmentStatus
               fulfillmentStatus
-              totalPrice
-              currencyCode
-              fulfillments {
-                trackingInfo {
+              totalPriceSet {
+                shopMoney {
+                  amount
+                  currencyCode
+                }
+              }
+              fulfillments(first: 5) {
+                trackingInfo(first: 5) {
                   number
                   url
                   company
+                }
+              }
+              lineItems(first: 10) {
+                edges {
+                  node {
+                    name
+                    quantity
+                  }
                 }
               }
             }
@@ -57,41 +67,46 @@ export const loader = async ({ request }) => {
 
     const data = await response.json();
     const order = data.data.orders.edges[0]?.node;
-    */
 
-    // MOCK DATA FOR NOW (until we have real API access)
-    // let upsellProducts = []; // eslint-disable-line no-unused-vars
-
-    // UPSELL LOGIC: Check settings from file (TODO: implement readSettings here if needed)
-    /* 
-    // Example of how we might read settings if we needed them here:
-    // const settings = await readSettings(shop);
-    */
+    // 3. Fetch Upsell Settings from Supabase
+    const { data: settings } = await supabase
+      .from("wismo_settings")
+      .select("*")
+      .eq("shop", session.shop)
+      .single();
     
-    // Simulate finding an order if the input looks valid
-    if (orderName === "1001" && email === "test@example.com") {
+    // 4. Upsell Logic (Mocked product fetching for now, using settings)
+    let upsellData = null;
+    if (settings?.is_enabled) {
+        upsellData = {
+            title: settings.upsell_title || "You might also like",
+            collectionId: settings.upsell_collection_id,
+            products: [
+                // In a real scenario, we'd fetch products from the collection via Admin API here
+                { title: "Cool Socks", price: "$10.00", image: "https://via.placeholder.com/100", url: "/products/cool-socks" },
+                { title: "Matching Hat", price: "$25.00", image: "https://via.placeholder.com/100", url: "/products/matching-hat" }
+            ]
+        };
+    }
+
+    if (order) {
+        // Transform Shopify Data to simplified JSON
+        const fulfillment = order.fulfillments[0];
+        const tracking = fulfillment?.trackingInfo[0];
+
         return Response.json({
             found: true,
-            status: "FULFILLED",
-            tracking: {
-                carrier: "UPS",
-                number: "1Z9999999999999999",
-                url: "https://www.ups.com/track?loc=en_US&tracknum=1Z9999999999999999"
-            },
-            items: ["Cool T-Shirt (L)", "Socks"],
-            estimatedDelivery: "2023-11-20",
-            
-            // Add Upsell Data to Response
-            upsell: {
-                title: "You might also like", // or settings.upsellTitle
-                products: [
-                    { title: "Cool Socks", price: "$10.00", image: "https://via.placeholder.com/100", url: "/products/cool-socks" },
-                    { title: "Matching Hat", price: "$25.00", image: "https://via.placeholder.com/100", url: "/products/matching-hat" }
-                ]
-            }
+            status: order.displayFulfillmentStatus,
+            tracking: tracking ? {
+                carrier: tracking.company,
+                number: tracking.number,
+                url: tracking.url
+            } : null,
+            items: order.lineItems.edges.map(edge => edge.node.name),
+            estimatedDelivery: "Calculated based on carrier...", // Placeholder
+            upsell: upsellData
         });
     } else {
-        // Simulate "Order Not Found"
         return Response.json({ 
             found: false, 
             message: "We couldn't find an order with that number and email." 

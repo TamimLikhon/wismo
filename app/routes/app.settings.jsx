@@ -1,3 +1,4 @@
+/* eslint-disable jsx-a11y/label-has-associated-control */
 import { useLoaderData, Form } from "react-router";
 import { authenticate } from "../shopify.server";
 import { supabase } from "../supabase.server";
@@ -57,39 +58,48 @@ export default function Settings() {
       <Form method="post" style={{ marginTop: "20px" }}>
         
         <div style={{ marginBottom: "20px" }}>
-          <label style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "1.1em", fontWeight: "bold" }}>
-            <input 
-              type="checkbox" 
-              name="isEnabled" 
-              defaultChecked={settings?.is_enabled} 
-              style={{ width: "20px", height: "20px" }}
-            />
-            Enable Upsell Engine
-          </label>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", fontSize: "1.1em", fontWeight: "bold" }}>
+             <label htmlFor="isEnabled" style={{ display: "flex", alignItems: "center", gap: "10px", cursor: "pointer" }}>
+               <input 
+                id="isEnabled"
+                type="checkbox" 
+                name="isEnabled" 
+                defaultChecked={settings?.is_enabled} 
+                style={{ width: "20px", height: "20px" }}
+              />
+              Enable Upsell Engine
+            </label>
+          </div>
         </div>
 
         <div style={{ marginBottom: "20px" }}>
-          <label style={{ display: "block", marginBottom: "5px", fontWeight: "bold" }}>Collection ID</label>
-          <input 
-            type="text" 
-            name="upsellCollectionId" 
-            defaultValue={settings?.upsell_collection_id || ""} 
-            placeholder="gid://shopify/Collection/123456789"
-            style={{ width: "100%", padding: "10px", fontSize: "1em", border: "1px solid #ccc", borderRadius: "4px" }}
-          />
+          <label style={{ display: "block", marginBottom: "5px", fontWeight: "bold" }}>
+            Collection ID
+            <input 
+              id="upsellCollectionId"
+              type="text" 
+              name="upsellCollectionId" 
+              defaultValue={settings?.upsell_collection_id || ""} 
+              placeholder="gid://shopify/Collection/123456789"
+              style={{ width: "100%", padding: "10px", fontSize: "1em", border: "1px solid #ccc", borderRadius: "4px", marginTop: "5px" }}
+            />
+          </label>
           <p style={{ fontSize: "0.85em", color: "#888", marginTop: "5px" }}>
             Paste the Collection GID from your Shopify Admin URL or leave blank to show random products.
           </p>
         </div>
 
         <div style={{ marginBottom: "20px" }}>
-          <label style={{ display: "block", marginBottom: "5px", fontWeight: "bold" }}>Widget Title</label>
-          <input 
-            type="text" 
-            name="upsellTitle" 
-            defaultValue={settings?.upsell_title || "You might also like"} 
-            style={{ width: "100%", padding: "10px", fontSize: "1em", border: "1px solid #ccc", borderRadius: "4px" }}
-          />
+          <label style={{ display: "block", marginBottom: "5px", fontWeight: "bold" }}>
+            Widget Title
+            <input 
+              id="upsellTitle"
+              type="text" 
+              name="upsellTitle" 
+              defaultValue={settings?.upsell_title || "You might also like"} 
+              style={{ width: "100%", padding: "10px", fontSize: "1em", border: "1px solid #ccc", borderRadius: "4px", marginTop: "5px" }}
+            />
+          </label>
         </div>
 
         <button type="submit" style={{

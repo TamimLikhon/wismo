@@ -31,7 +31,7 @@ export const PLANS = [
 
 export const loader = async ({ request }) => {
   const { billing } = await authenticate.admin(request);
-  const billingCheck = await billing.require({
+  await billing.require({
     plans: [PLANS[1].name], // Check if they have the Pro plan
     isTest: true,
     onFailure: async () => billing.request({ plan: PLANS[1].name, isTest: true }), // Redirect to payment if failed
