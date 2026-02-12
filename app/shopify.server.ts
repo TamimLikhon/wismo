@@ -4,7 +4,8 @@ import {
   AppDistribution,
   shopifyApp,
 } from "@shopify/shopify-app-react-router/server";
-import { MemorySessionStorage } from "@shopify/shopify-app-session-storage-memory"; // Fixed import
+import { BillingInterval } from "@shopify/shopify-api";
+import { MemorySessionStorage } from "@shopify/shopify-app-session-storage-memory";
 
 const shopify = shopifyApp({
   apiKey: process.env.SHOPIFY_API_KEY,
@@ -17,6 +18,26 @@ const shopify = shopifyApp({
   distribution: AppDistribution.AppStore,
   future: {
     expiringOfflineAccessTokens: true,
+  },
+  billing: {
+    Free: {
+      lineItems: [
+        {
+          amount: 0,
+          currencyCode: "USD",
+          interval: BillingInterval.Every30Days,
+        },
+      ],
+    },
+    Pro: {
+      lineItems: [
+        {
+          amount: 29,
+          currencyCode: "USD",
+          interval: BillingInterval.Every30Days,
+        },
+      ],
+    },
   },
   ...(process.env.SHOP_CUSTOM_DOMAIN
     ? { customShopDomains: [process.env.SHOP_CUSTOM_DOMAIN] }
