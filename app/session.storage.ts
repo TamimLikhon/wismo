@@ -24,38 +24,43 @@ export class SupabaseSessionStorage implements SessionStorage {
   }
 
   async loadSession(id: string): Promise<Session | undefined> {
-    const { data, error } = await supabase
-      .from("session")
-      .select("*")
-      .eq("id", id)
-      .single();
+    try {
+      const { data, error } = await supabase
+        .from("session")
+        .select("*")
+        .eq("id", id)
+        .single();
 
-    if (error || !data) {
-      if (error && error.code !== "PGRST116") {
-        console.error("Failed to load session from Supabase:", error);
+      if (error || !data) {
+        if (error && error.code !== "PGRST116") {
+          console.error("Failed to load session from Supabase:", error);
+        }
+        return undefined;
       }
+
+      const session = new Session({
+        id: data.id,
+        shop: data.shop,
+        state: data.state,
+        isOnline: data.isonline,
+        scope: data.scope,
+        expires: data.expires ? new Date(data.expires) : undefined,
+        accessToken: data.accesstoken,
+      });
+
+      if (data.userid) {
+        session.onlineAccessInfo = {
+          associated_user: {
+            id: Number(data.userid),
+          } as any,
+        } as any;
+      }
+
+      return session;
+    } catch (e) {
+      console.error("Fatal error in loadSession:", e);
       return undefined;
     }
-
-    const session = new Session({
-      id: data.id,
-      shop: data.shop,
-      state: data.state,
-      isOnline: data.isonline,
-      scope: data.scope,
-      expires: data.expires ? new Date(data.expires) : undefined,
-      accessToken: data.accesstoken,
-    });
-
-    if (data.userid) {
-      session.onlineAccessInfo = {
-        associated_user: {
-          id: Number(data.userid),
-        } as any,
-      } as any;
-    }
-
-    return session;
   }
 
   async deleteSession(id: string): Promise<boolean> {
@@ -81,36 +86,41 @@ export class SupabaseSessionStorage implements SessionStorage {
   }
 
   async findSessionsByShop(shop: string): Promise<Session[]> {
-    const { data, error } = await supabase
-      .from("session")
-      .select("*")
-      .eq("shop", shop);
+    try {
+      const { data, error } = await supabase
+        .from("session")
+        .select("*")
+        .eq("shop", shop);
 
-    if (error || !data) {
-      console.error("Failed to find sessions by shop in Supabase:", error);
-      return [];
-    }
-
-    return data.map((d) => {
-      const session = new Session({
-        id: d.id,
-        shop: d.shop,
-        state: d.state,
-        isOnline: d.isonline,
-        scope: d.scope,
-        expires: d.expires ? new Date(d.expires) : undefined,
-        accessToken: d.accesstoken,
-      });
-
-      if (d.userid) {
-        session.onlineAccessInfo = {
-          associated_user: {
-            id: Number(d.userid),
-          } as any,
-        } as any;
+      if (error || !data) {
+        console.error("Failed to find sessions by shop in Supabase:", error);
+        return [];
       }
 
-      return session;
-    });
+      return data.map((d) => {
+        const session = new Session({
+          id: d.id,
+          shop: d.shop,
+          state: d.state,
+          isOnline: d.isonline,
+          scope: d.scope,
+          expires: d.expires ? new Date(d.expires) : undefined,
+          accessToken: d.accesstoken,
+        });
+
+        if (d.userid) {
+          session.onlineAccessInfo = {
+            associated_user: {
+              id: Number(d.userid),
+            } as any,
+          } as any;
+        }
+
+        return session;
+      });
+    } catch (e) {
+      console.error("Fatal error in findSessionsByShop:", e);
+      return [];
+    }
   }
 }

@@ -99,7 +99,6 @@ export const loader = async ({ request }) => {
               name
               email
               displayFulfillmentStatus
-              fulfillmentStatus
               totalPriceSet {
                 shopMoney {
                   amount
